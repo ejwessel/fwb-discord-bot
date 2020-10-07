@@ -44,6 +44,7 @@ async function main() {
       reactionCount += reaction.count
     })
 
+    // only add users that have positive reaction count, otherwise aggregate the count
     if (!(user in userCounts) && reactionCount > 0) {
       userCounts[user] = reactionCount
     } else if (user in userCounts) {
