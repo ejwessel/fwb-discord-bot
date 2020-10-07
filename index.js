@@ -5,25 +5,13 @@ const axios = require('axios');
 const PORT = Number(process.env.PORT) || 8080
 
 const FWB_REACTION_ID = '754425061229854882'
-const BASE_URL = 'https://discord.com/api/'
+const BASE_URL = 'https://discord.com/api'
 const CHANNEL_ID = '749443579499511860'
 const MESSAGE_LIMIT = 100 // the api max is 100
 const TOKEN = process.env.TOKEN
 
-async function main() {
-  const response = await axios.get(`${BASE_URL}/channels/${CHANNEL_ID}/messages`, {
-    headers: {
-      'Authorization': `Bot ${TOKEN}`,
-    },
-    params: {
-      limit: MESSAGE_LIMIT
-    }
-  })
-
-  const { data } = response
-
+function processResponse(userCounts, data) {
   // map FWB counts to user
-  let userCounts = {}
   data.forEach(message => {
     const timestamp = message.timestamp
 
@@ -51,6 +39,40 @@ async function main() {
       userCounts[user] += reactionCount
     }
   })
+
+  return userCounts
+}
+
+async function main() {
+
+  // iterate through messages as long as there are 100 messages to parse or the time duration is breached
+  let lastId = null
+  let userCounts = {}
+
+  do {
+    let params = { limit: MESSAGE_LIMIT }
+    if (lastId !== null) {
+      params.before = lastId
+    }
+
+    const response = await axios.get(`${BASE_URL}/channels/${CHANNEL_ID}/messages`, {
+      headers: {
+        'Authorization': `Bot ${TOKEN}`,
+      },
+      params: params
+    })
+    const { data } = response
+    userCounts = processResponse(userCounts, data)
+
+    // obtain last message ID
+    const nextId = data[data.length - 1].id
+    if (nextId == lastId) {
+      console.log("no more messages")
+      break
+    }
+    lastId = nextId
+    console.log(lastId)
+  } while (lastId !== null)
 
   console.log(userCounts)
 }
