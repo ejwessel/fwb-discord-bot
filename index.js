@@ -10,7 +10,7 @@ const BASE_URL = 'https://discord.com/api'
 const CHANNEL_ID = '749443579499511860'
 const MESSAGE_LIMIT = 100 // the api max is 100
 const TOKEN = process.env.TOKEN
-const LOOKBACK = 7 * (24 * 60 * 60 * 100)
+const LOOKBACK = 7 * (24 * 60 * 60 * 100) // 1 week lookback
 
 function processResponse(start, lookback, userCounts, data) {
   let returnData = { shouldContinue: false, counts: userCounts }
