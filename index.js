@@ -2,9 +2,7 @@ require('dotenv').config()
 var express = require('express')
 var app = express()
 const axios = require('axios');
-const axiosRetry = require('axios-retry');
-
-axiosRetry(axios, { retries: 10 });
+const rateLimit = require('axios-rate-limit');
 
 const PORT = Number(process.env.PORT) || 8080
 const FWB_REACTION_ID = '754425061229854882'
@@ -12,8 +10,6 @@ const BASE_URL = 'https://discord.com/api'
 const CHANNEL_ID = '749443579499511860'
 const MESSAGE_LIMIT = 100 // the api max is 100
 const TOKEN = process.env.TOKEN
-
-
 
 function processResponse(userCounts, data) {
   // map FWB counts to user
@@ -54,45 +50,41 @@ async function main() {
   let lastId = null
   let userCounts = {}
 
+  const instance = rateLimit(axios.create(), { maxRPS: 1 })
+
   do {
     let params = { limit: MESSAGE_LIMIT }
     if (lastId !== null) {
       params.before = lastId
     }
 
-    const response = await axios.get(`${BASE_URL}/channels/${CHANNEL_ID}/messages`, {
-      headers: {
-        'Authorization': `Bot ${TOKEN}`,
-      },
-      params: params
-    })
-      .then((response) => {
-        const { data } = response
-        userCounts = processResponse(userCounts, data)
-
-        // obtain last message ID
-        const nextId = data[data.length - 1].id
-        if (nextId == lastId) {
-          console.log("no more messages")
-          return
-        }
-        lastId = nextId
-        console.log(lastId)
+    try {
+      const response = await instance.get(`${BASE_URL}/channels/${CHANNEL_ID}/messages`, {
+        headers: {
+          'Authorization': `Bot ${TOKEN}`,
+        },
+        params: params
       })
-      .catch((error) => {
-        if (error.response) {
-          console.log("response error")
-          console.log(error.response.status)
-          console.log(error.response.data)
 
-          axiosRetry(axios, { retryDelay: error.response.data.retry_after * 1000 });
+      const { data } = response
+      if (data.length === 0) {
+        console.log("no more messages")
+        break
+      }
 
-        } else if (error.request) {
-          console.log("request error")
-        }
-      })
-  } while (lastId !== null)
-
+      newLastId = data[data.length - 1].id
+      lastId = newLastId
+      console.log(`processing message ids (${lastId}, ${newLastId})`)
+      userCounts = processResponse(userCounts, data)
+    } catch (error) {
+      if (error.response) {
+        console.log(`response error: ${error.response.status}`)
+        console.log(error.response.data)
+      } else if (error.request) {
+        console.log("request error")
+      }
+    }
+  } while (lastId != null)
   console.log(userCounts)
 }
 
@@ -112,5 +104,5 @@ main().catch((e) => {
 // })
 
 // app.listen(PORT, () => {
-//   console.log(`App listening on port ${PORT}`)
+//   console.log(`App listening on port ${ PORT }`)
 // })
