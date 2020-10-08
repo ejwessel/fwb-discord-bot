@@ -2,13 +2,18 @@ require('dotenv').config()
 var express = require('express')
 var app = express()
 const axios = require('axios');
-const PORT = Number(process.env.PORT) || 8080
+const axiosRetry = require('axios-retry');
 
+axiosRetry(axios, { retries: 10 });
+
+const PORT = Number(process.env.PORT) || 8080
 const FWB_REACTION_ID = '754425061229854882'
 const BASE_URL = 'https://discord.com/api'
 const CHANNEL_ID = '749443579499511860'
 const MESSAGE_LIMIT = 100 // the api max is 100
 const TOKEN = process.env.TOKEN
+
+
 
 function processResponse(userCounts, data) {
   // map FWB counts to user
@@ -61,17 +66,31 @@ async function main() {
       },
       params: params
     })
-    const { data } = response
-    userCounts = processResponse(userCounts, data)
+      .then((response) => {
+        const { data } = response
+        userCounts = processResponse(userCounts, data)
 
-    // obtain last message ID
-    const nextId = data[data.length - 1].id
-    if (nextId == lastId) {
-      console.log("no more messages")
-      break
-    }
-    lastId = nextId
-    console.log(lastId)
+        // obtain last message ID
+        const nextId = data[data.length - 1].id
+        if (nextId == lastId) {
+          console.log("no more messages")
+          return
+        }
+        lastId = nextId
+        console.log(lastId)
+      })
+      .catch((error) => {
+        if (error.response) {
+          console.log("response error")
+          console.log(error.response.status)
+          console.log(error.response.data)
+
+          axiosRetry(axios, { retryDelay: error.response.data.retry_after * 1000 });
+
+        } else if (error.request) {
+          console.log("request error")
+        }
+      })
   } while (lastId !== null)
 
   console.log(userCounts)
