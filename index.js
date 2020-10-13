@@ -10,7 +10,7 @@ const BASE_URL = 'https://discord.com/api'
 const CHANNEL_ID = '749443579499511860'
 const MESSAGE_LIMIT = 100 // the api max is 100
 const TOKEN = process.env.TOKEN
-const LOOKBACK = 7 * (24 * 60 * 60 * 100) // 1 week lookback
+const LOOKBACK = 7 * (24 * 60 * 60 * 1000) // 1 week lookback
 
 function processResponse(start, lookback, userCounts, data) {
   let returnData = { shouldContinue: false, counts: userCounts }
@@ -86,11 +86,14 @@ async function main() {
       }
 
       newLastId = data[data.length - 1].id
-      lastId = newLastId
+      if (lastId === null) {
+        lastId = data[0].id
+      }
       console.log(`processing message ids (${lastId}, ${newLastId})`)
       const processedData = processResponse(currentTime, LOOKBACK, userCounts, data)
       shouldContinue = processedData.shouldContinue
       userCounts = processedData.counts
+      lastId = newLastId
     } catch (error) {
       if (error.response) {
         console.log(`response error: ${error.response.status}`)
